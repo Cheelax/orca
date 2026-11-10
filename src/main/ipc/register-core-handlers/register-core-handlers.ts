@@ -19,7 +19,6 @@ import { registerHostedReviewHandlers } from '../source-control/hosted-review'
 import { registerLinearHandlers } from '../linear/register-handlers'
 import { registerJiraHandlers } from '../jira/register-handlers'
 import { registerJiraIssueSummaryGenerationHandlers } from '../jira/issue-summary-generation'
-import { registerWorktreeIconGenerationHandlers } from '../worktree-icon-generation'
 import { registerBitbucketHandlers } from '../source-control/bitbucket'
 import { registerFeedbackHandlers } from '../feedback'
 import { registerCrashReportingHandlers } from '../crash-reporting/crash-reporting'
@@ -180,7 +179,6 @@ export function registerCoreHandlers(
   registerLinearHandlers()
   registerJiraHandlers()
   registerJiraIssueSummaryGenerationHandlers(store, commitMessageAgentEnv)
-  registerWorktreeIconGenerationHandlers(store, commitMessageAgentEnv)
   registerBitbucketHandlers()
   registerFeedbackHandlers()
   if (crashReports) {
