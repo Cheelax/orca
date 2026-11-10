@@ -40,6 +40,7 @@ export type RuntimeClientSettings = Pick<
   | 'nativeChatCiResultLines'
   | 'sourceControlGroupOrder'
   | 'sourceControlCompareAgainstUpstream'
+  | 'prAutoRefresh'
   | 'diffShowWhitespace'
 > & {
   hostSettingOverrides: RuntimeHostDisplayLabelOverrides
@@ -82,4 +83,5 @@ export type RuntimeClientSettingsUpdate = Pick<
   | 'machineName'
   | 'nativeChatPermissionMode'
   | 'nativeChatAutoContinueAfterUsageLimit'
+  | 'prAutoRefresh'
 >
