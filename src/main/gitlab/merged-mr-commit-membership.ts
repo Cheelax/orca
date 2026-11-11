@@ -14,6 +14,7 @@ import {
   type ProjectRef
 } from './gl-utils'
 import { encodedProject } from './project-path-encoding'
+import { mergedReviewHeadIsEquivalent } from '../source-control/merged-review-head-equivalence'
 
 const membershipMemo = new MergedReviewMembershipMemo<ReadonlySet<string>>({
   weight: (ids) => 1024 + 256 * ids.size,
@@ -90,6 +91,7 @@ export async function mergedMRContainsHead(
     iid: number
     headOid: string
     revisionHeadSha?: string
+    baseRefName?: string
     diffRefs?: unknown
     userRefresh?: boolean
   }
@@ -145,5 +147,17 @@ export async function mergedMRContainsHead(
           load,
           { refreshFailed: args.userRefresh }
         )
-  return ids.has(args.headOid.toLowerCase()) ? 'contained' : 'not-contained'
+  if (ids.has(args.headOid.toLowerCase())) {
+    return 'contained'
+  }
+  // A local rebase mints a SHA GitLab never saw; prove it adds nothing beyond the merged MR.
+  const equivalent = await mergedReviewHeadIsEquivalent({
+    repoPath: args.repoPath,
+    connectionId: args.connectionId,
+    localGitOptions: args.localGitOptions,
+    reviewHeadOid: args.revisionHeadSha,
+    baseBranchName: args.baseRefName,
+    headOid: args.headOid
+  })
+  return equivalent ? 'contained' : 'not-contained'
 }

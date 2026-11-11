@@ -1,9 +1,7 @@
 import type { PRRefreshOutcome } from '../../../../shared/github/pull-request-refresh-types'
 import type { ghRepoExecOptions, OwnerRepo } from '../../gh-utils'
-import {
-  isCommitPartOfMergedPR,
-  type MergedPRCommitMembership
-} from '../../merged-pr-commit-membership'
+import type { MergedPRCommitMembership } from '../../merged-pr-commit-membership'
+import { mergedPRHeadMembership } from '../../merged-pr-head-membership'
 import { shouldHideNonOpenReviewOnDefaultBranch } from '../../../source-control/repo-default-branch'
 import {
   getGitHubApiRepositoryForRemote,
@@ -99,11 +97,16 @@ export async function resolvePRForBranchOutcome(input: {
     if (!candidateRepo || !headOid) {
       return 'unknown'
     }
-    const membership = await isCommitPartOfMergedPR({
+    const membership = await mergedPRHeadMembership({
       ownerRepo: candidateRepo,
       prNumber: candidate.number,
-      commitOid: headOid,
-      ghOptions
+      prHeadOid: candidate.headRefOid,
+      baseRefName: candidate.baseRefName,
+      headOid,
+      ghOptions,
+      repoPath,
+      connectionId,
+      localGitOptions
     })
     if (membership === 'contained') {
       confirmedContainedHeadOid = headOid

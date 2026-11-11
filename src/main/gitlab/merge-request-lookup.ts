@@ -227,6 +227,7 @@ export async function getMergeRequestForBranch(
                 iid: info.number,
                 headOid: currentHead,
                 revisionHeadSha: info.headSha,
+                baseRefName: info.baseRefName,
                 diffRefs: raw.diff_refs,
                 connectionId,
                 localGitOptions,
