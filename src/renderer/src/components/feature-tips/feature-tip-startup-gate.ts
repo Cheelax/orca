@@ -1,6 +1,7 @@
 import {
   getCompletedFeatureTipIds,
   getOrderedUnseenFeatureTips,
+  isChatUiLaunchTipControl,
   type FeatureTip,
   type FeatureTipId,
   type FeatureTipSeenId
@@ -54,7 +55,12 @@ export function getPendingFeatureTips(args: {
       cliInstalled: args.cliInstalled,
       voiceDictationEnabled: args.settings?.voice?.enabled === true,
       sessionSearchTipCompleted: isSessionSearchFeatureTipCompleted(args.settings, args.webClient),
-      chatUiLaunchTipCompleted: args.webClient || args.chatUiLaunchTipVariant === 'none',
+      chatUiLaunchTipCompleted:
+        args.webClient ||
+        args.chatUiLaunchTipVariant === 'none' ||
+        // Why: controls on Chat UI at launch who are on the terminal now switched back, so they stay out.
+        (args.chatUiLaunchTipVariant === 'chat-ui-on' &&
+          isChatUiLaunchTipControl(args.settings?.telemetry)),
       featureInteractions: args.featureInteractions
     })
   })

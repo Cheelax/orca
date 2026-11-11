@@ -12,15 +12,35 @@ export type FeatureTipId =
   | 'cmd-j-palette'
   | 'agent-session-search'
 
-export type FeatureTipSeenId = FeatureTipId | 'chat-ui-here-rollout-v1'
+const CHAT_UI_HERE_ROLLOUT_SEEN_IDS = [
+  'chat-ui-here-rollout-v1',
+  'chat-ui-here-rollout-v2'
+] as const
+
+export type FeatureTipSeenId = FeatureTipId | (typeof CHAT_UI_HERE_ROLLOUT_SEEN_IDS)[number]
+
+type ChatUiLaunchTipCohortSettings = Pick<
+  TelemetrySettings,
+  'chatUiLaunchTipCohort' | 'chatUiLaunchTipRolloutCohort'
+>
+
+/** Profiles the earlier draws held back as controls; the v2 rollout offers them the tip too. */
+export function isChatUiLaunchTipControl(telemetry: ChatUiLaunchTipCohortSettings | undefined) {
+  return (telemetry?.chatUiLaunchTipRolloutCohort ?? telemetry?.chatUiLaunchTipCohort) === 'control'
+}
 
 export function getFeatureTipSeenId(
   id: FeatureTipId,
-  telemetry: Pick<TelemetrySettings, 'chatUiLaunchTipRolloutCohort'> | undefined
+  telemetry: ChatUiLaunchTipCohortSettings | undefined
 ): FeatureTipSeenId {
-  return id === 'chat-ui-here' && telemetry?.chatUiLaunchTipRolloutCohort
-    ? 'chat-ui-here-rollout-v1'
-    : id
+  if (id !== 'chat-ui-here') {
+    return id
+  }
+  // Why: suppressing a control already marked the older ids seen, so it needs a fresh one.
+  if (isChatUiLaunchTipControl(telemetry)) {
+    return 'chat-ui-here-rollout-v2'
+  }
+  return telemetry?.chatUiLaunchTipRolloutCohort ? 'chat-ui-here-rollout-v1' : id
 }
 
 export type FeatureTipPriority = 'new' | 'unseen'
@@ -113,7 +133,7 @@ export const FEATURE_TIPS = [
 export const FEATURE_TIP_IDS = FEATURE_TIPS.map((tip) => tip.id)
 export const FEATURE_TIP_SEEN_IDS: readonly FeatureTipSeenId[] = [
   ...FEATURE_TIP_IDS,
-  'chat-ui-here-rollout-v1'
+  ...CHAT_UI_HERE_ROLLOUT_SEEN_IDS
 ]
 
 export function isFeatureTipId(value: unknown): value is FeatureTipId {
@@ -121,7 +141,7 @@ export function isFeatureTipId(value: unknown): value is FeatureTipId {
 }
 
 export function isFeatureTipSeenId(value: unknown): value is FeatureTipSeenId {
-  return value === 'chat-ui-here-rollout-v1' || isFeatureTipId(value)
+  return FEATURE_TIP_SEEN_IDS.some((id) => id === value)
 }
 
 export function normalizeFeatureTipIds(value: unknown): FeatureTipSeenId[] {
@@ -167,7 +187,7 @@ export function getCompletedFeatureTipIds(state: CompletedFeatureTipState): Set<
 export function getOrderedUnseenFeatureTips(args: {
   seenTipIds: ReadonlySet<FeatureTipSeenId>
   completedTipIds?: ReadonlySet<FeatureTipId>
-  telemetry?: Pick<TelemetrySettings, 'chatUiLaunchTipRolloutCohort'>
+  telemetry?: ChatUiLaunchTipCohortSettings
 }): FeatureTip[] {
   const completedTipIds = args.completedTipIds ?? new Set<FeatureTipId>()
   const unseenTips = FEATURE_TIPS.filter(
