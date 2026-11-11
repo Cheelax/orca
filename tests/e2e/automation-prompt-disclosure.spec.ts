@@ -2,11 +2,16 @@ import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 
 const SHORT_NAME = 'synthetic-short-prompt-demo'
+const NINE_LINE_NAME = 'synthetic-nine-line-prompt-demo'
 const RESIZE_NAME = 'synthetic-resize-prompt-demo'
 const LONG_NAME = 'visual-proof-long-prompt-demo'
 const END_MARKER = 'SYNTHETIC-END-MARKER'
 // Exactly eight short lines: the most a collapsed preview shows without a toggle.
 const SHORT_PROMPT = Array.from({ length: 8 }, (_, index) => `Short step ${index + 1}.`).join('\n')
+// Nine short lines: one past the collapsed preview, without relying on wrapping.
+const NINE_LINE_PROMPT = Array.from({ length: 9 }, (_, index) => `Nine step ${index + 1}.`).join(
+  '\n'
+)
 // Seven ~72-character lines: one row each at 1400px, two each (14 rows) at 820px.
 const RESIZE_PROMPT = Array.from(
   { length: 7 },
@@ -20,7 +25,16 @@ test('automation detail shows prompts of up to eight lines whole and discloses l
   await orcaPage.setViewportSize({ width: 820, height: 700 })
 
   await orcaPage.evaluate(
-    async ({ shortName, shortPrompt, resizeName, resizePrompt, longName, endMarker }) => {
+    async ({
+      shortName,
+      shortPrompt,
+      nineLineName,
+      nineLinePrompt,
+      resizeName,
+      resizePrompt,
+      longName,
+      endMarker
+    }) => {
       const store = window.__store
       if (!store) {
         throw new Error('window.__store is not available')
@@ -53,6 +67,11 @@ test('automation detail shows prompts of up to eight lines whole and discloses l
       })
       await createAutomation({
         ...base,
+        name: nineLineName,
+        prompt: nineLinePrompt
+      })
+      await createAutomation({
+        ...base,
         name: longName,
         prompt: [
           'Synthetic prompt preview validation only.',
@@ -78,6 +97,8 @@ test('automation detail shows prompts of up to eight lines whole and discloses l
     {
       shortName: SHORT_NAME,
       shortPrompt: SHORT_PROMPT,
+      nineLineName: NINE_LINE_NAME,
+      nineLinePrompt: NINE_LINE_PROMPT,
       resizeName: RESIZE_NAME,
       resizePrompt: RESIZE_PROMPT,
       longName: LONG_NAME,
@@ -94,6 +115,34 @@ test('automation detail shows prompts of up to eight lines whole and discloses l
   await expect(shortPrompt).toBeVisible()
   expect(await shortPrompt.evaluate(promptShowsAllText)).toBe(true)
   await expect(orcaPage.getByRole('button', { name: 'Show more' })).toHaveCount(0)
+
+  await orcaPage.getByRole('button', { name: 'All automations' }).click()
+  await orcaPage.getByRole('button', { name: new RegExp(`^${NINE_LINE_NAME}`) }).click()
+  const nineLineToggle = orcaPage.getByRole('button', { name: /^Show (more|less)$/ })
+  await expect(nineLineToggle).toHaveText('Show more')
+  const nineLinePrompt = orcaPage.locator(
+    `[id="${await nineLineToggle.getAttribute('aria-controls')}"]`
+  )
+  const lastLineIsInsidePrompt = (element: HTMLElement, line: string): boolean => {
+    const text = element.firstChild
+    if (!(text instanceof Text)) {
+      throw new Error('Prompt text node is unavailable')
+    }
+    const start = text.data.indexOf(line)
+    if (start === -1) {
+      throw new Error('Prompt line is unavailable')
+    }
+    const range = document.createRange()
+    range.setStart(text, start)
+    range.setEnd(text, start + line.length)
+    return range.getBoundingClientRect().bottom <= element.getBoundingClientRect().bottom + 1
+  }
+  expect(await nineLinePrompt.evaluate(lastLineIsInsidePrompt, 'Nine step 9.')).toBe(false)
+  await nineLineToggle.click()
+  await expect(nineLineToggle).toHaveText('Show less')
+  await expect(nineLineToggle).toHaveAttribute('aria-expanded', 'true')
+  expect(await nineLinePrompt.evaluate(lastLineIsInsidePrompt, 'Nine step 9.')).toBe(true)
+  expect(await nineLinePrompt.evaluate(promptShowsAllText)).toBe(true)
 
   await orcaPage.getByRole('button', { name: 'All automations' }).click()
   await orcaPage.getByRole('button', { name: new RegExp(`^${RESIZE_NAME}`) }).click()
