@@ -12,6 +12,7 @@ import {
 } from '../permissions/tui-agent-permission-choice'
 import type { TuiAgent } from '../catalog/tui-agent'
 import type { AgentPickerEntry, AgentPickerModel, AgentPickerSurface } from './agent-launch-picker'
+import { legacyAgentModelIds } from '../../legacy-agent-models'
 
 export function agentPickerOptions(
   agent: TuiAgent,
@@ -106,9 +107,9 @@ export function agentPickerModels(
   entry: Pick<AgentPickerEntry, 'agent' | 'catalog'>
 ): AgentPickerModel[] {
   if (entry.catalog.origin !== 'unknown') {
-    return entry.catalog.models
+    return withLegacyModels(entry.agent, entry.catalog.models)
   }
-  return (getAgentSessionOptionLaunchCatalog(entry.agent)?.models ?? []).map((model) => ({
+  const seeded = (getAgentSessionOptionLaunchCatalog(entry.agent)?.models ?? []).map((model) => ({
     id: model.id,
     label: model.label,
     description: model.description,
@@ -117,4 +118,12 @@ export function agentPickerModels(
       option.id === 'effort' && option.kind.type === 'select' ? option.kind.choices : []
     )
   }))
+  return withLegacyModels(entry.agent, seeded)
+}
+
+function withLegacyModels(agent: TuiAgent, models: AgentPickerModel[]): AgentPickerModel[] {
+  const legacy = legacyAgentModelIds(agent, models)
+  return legacy.size
+    ? models.map((model) => (legacy.has(model.id) ? { ...model, isLegacy: true } : model))
+    : models
 }
