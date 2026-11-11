@@ -171,7 +171,7 @@ describe('reads of workers a paired server runs, from this Orca’s records', ()
     expect(page.warnings).toEqual(['Showing the newest 1 of 2 workers on paired servers.'])
   })
 
-  it('names a server removed since by the name it had, and says it was removed', () => {
+  it('names a server removed since by the name it had, and says it was removed', async () => {
     const record = remoteWorker('task_1', 'ctx_w1', 'env_gone')
     closeRemoteRunLink(
       db,
@@ -184,6 +184,8 @@ describe('reads of workers a paired server runs, from this Orca’s records', ()
     expect(shown.observation.reason).toBe(
       "devB was removed from this Orca's paired servers. It no longer reports this worker here; this is devB's state as of 2026-11-09T08:30:00Z. Its output is kept only on devB."
     )
+    const listed = await listWorkers({ run: run.id, paginate: true })
+    expect(listed.workers[0]?.server).toMatchObject({ name: 'devB', repaired: true })
   })
 
   it('lists remote workers on the first page beside local ones, named by their server, and nowhere else', async () => {
