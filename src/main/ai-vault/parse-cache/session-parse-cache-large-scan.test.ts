@@ -18,6 +18,7 @@ import {
 } from './session-parse-cache-store'
 import { createSessionParseStats, parseListedSessionFile } from './session-scanner-parse-cache'
 import type { SessionFileCandidate } from '../session-scanner-types'
+import { sessionParseCacheDatabasePath } from './session-parse-cache-version-files'
 
 const CANDIDATES = Math.max(MAX_RESUME_ENTRIES, MAX_UNLISTED_ENTRIES) + 178
 let root: string | undefined
@@ -75,7 +76,7 @@ it('does not reparse an unchanged corpus past the resume bound, across scans or 
   await list(first)
   await list(second)
   await flushSessionParseCachePersist()
-  const db = new SyncDatabase(join(root, 'session-parse-cache.sqlite'))
+  const db = new SyncDatabase(sessionParseCacheDatabasePath(root))
   expect(db.prepare('SELECT COUNT(*) AS count FROM rows').get()).toEqual({ count: CANDIDATES })
   db.close()
   resetSessionParseCachePersistenceForTests()
