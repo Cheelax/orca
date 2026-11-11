@@ -5,16 +5,22 @@ const SHORT_NAME = 'synthetic-short-prompt-demo'
 const RESIZE_NAME = 'synthetic-resize-prompt-demo'
 const LONG_NAME = 'visual-proof-long-prompt-demo'
 const END_MARKER = 'SYNTHETIC-END-MARKER'
-const RESIZE_PROMPT = `Synthetic resize focus validation. ${'placeholder '.repeat(48)}`
+// Exactly eight short lines: the most a collapsed preview shows without a toggle.
+const SHORT_PROMPT = Array.from({ length: 8 }, (_, index) => `Short step ${index + 1}.`).join('\n')
+// Seven ~72-character lines: one row each at 1400px, two each (14 rows) at 820px.
+const RESIZE_PROMPT = Array.from(
+  { length: 7 },
+  (_, index) => `Synthetic resize line ${index + 1}: ${'placeholder '.repeat(4).trim()}`
+).join('\n')
 
-test('automation detail keeps short prompts readable and reveals a very long prompt at narrow width', async ({
+test('automation detail shows prompts of up to eight lines whole and discloses longer ones', async ({
   orcaPage
 }) => {
   await waitForSessionReady(orcaPage)
   await orcaPage.setViewportSize({ width: 820, height: 700 })
 
   await orcaPage.evaluate(
-    async ({ shortName, resizeName, resizePrompt, longName, endMarker }) => {
+    async ({ shortName, shortPrompt, resizeName, resizePrompt, longName, endMarker }) => {
       const store = window.__store
       if (!store) {
         throw new Error('window.__store is not available')
@@ -43,7 +49,7 @@ test('automation detail keeps short prompts readable and reveals a very long pro
       await createAutomation({
         ...base,
         name: shortName,
-        prompt: 'Synthetic short prompt.'
+        prompt: shortPrompt
       })
       await createAutomation({
         ...base,
@@ -71,6 +77,7 @@ test('automation detail keeps short prompts readable and reveals a very long pro
     },
     {
       shortName: SHORT_NAME,
+      shortPrompt: SHORT_PROMPT,
       resizeName: RESIZE_NAME,
       resizePrompt: RESIZE_PROMPT,
       longName: LONG_NAME,
@@ -78,53 +85,61 @@ test('automation detail keeps short prompts readable and reveals a very long pro
     }
   )
 
+  const promptShowsAllText = (element: HTMLElement): boolean =>
+    element.scrollHeight <= element.clientHeight + 1 &&
+    element.scrollWidth <= element.clientWidth + 1
+
   await orcaPage.getByRole('button', { name: new RegExp(`^${SHORT_NAME}`) }).click()
-  await expect(orcaPage.getByText('Synthetic short prompt.')).toBeVisible()
+  const shortPrompt = orcaPage.getByText('Short step 8.')
+  await expect(shortPrompt).toBeVisible()
+  expect(await shortPrompt.evaluate(promptShowsAllText)).toBe(true)
   await expect(orcaPage.getByRole('button', { name: 'Show more' })).toHaveCount(0)
 
   await orcaPage.getByRole('button', { name: 'All automations' }).click()
   await orcaPage.getByRole('button', { name: new RegExp(`^${RESIZE_NAME}`) }).click()
-  const resizePrompt = orcaPage.getByText(RESIZE_PROMPT)
-  const resizeToggle = orcaPage.getByRole('button', { name: 'Show more' })
-  await expect(resizeToggle).toBeVisible()
+  const resizeToggle = orcaPage.getByRole('button', { name: /^Show (more|less)$/ })
+  await expect(resizeToggle).toHaveText('Show more')
+  await expect(resizeToggle).toHaveAttribute('aria-expanded', 'false')
+  const resizePrompt = orcaPage.locator(
+    `[id="${await resizeToggle.getAttribute('aria-controls')}"]`
+  )
+  expect(await resizePrompt.evaluate(promptShowsAllText)).toBe(false)
+
   await resizeToggle.focus()
+  await orcaPage.keyboard.press('Enter')
+  await expect(resizeToggle).toHaveText('Show less')
+  await expect(resizeToggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(resizeToggle).toBeFocused()
+  expect(await resizePrompt.evaluate(promptShowsAllText)).toBe(true)
+
+  await orcaPage.keyboard.press('Enter')
+  await expect(resizeToggle).toHaveText('Show more')
+  await expect(resizeToggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(resizeToggle).toBeFocused()
+  expect(await resizePrompt.evaluate(promptShowsAllText)).toBe(false)
+
+  // Widening until the prompt fits removes the toggle and keeps focus inside the prompt.
   await orcaPage.setViewportSize({ width: 1400, height: 700 })
   await expect(resizeToggle).toHaveCount(0)
   await expect(resizePrompt).toBeFocused()
+  expect(await resizePrompt.evaluate(promptShowsAllText)).toBe(true)
 
   await orcaPage.setViewportSize({ width: 820, height: 700 })
   await orcaPage.getByRole('button', { name: 'All automations' }).click()
   await orcaPage.getByRole('button', { name: new RegExp(`^${LONG_NAME}`) }).click()
 
   const prompt = orcaPage.getByText(new RegExp(END_MARKER))
-  const showMore = orcaPage.getByRole('button', { name: 'Show more' })
-  await expect(showMore).toBeVisible()
-  expect(await showMore.getAttribute('aria-controls')).toBe(await prompt.getAttribute('id'))
-  const collapsedMetrics = await prompt.evaluate((element) => ({
-    clientHeight: element.clientHeight,
-    scrollHeight: element.scrollHeight,
-    lineClamp: getComputedStyle(element).webkitLineClamp
-  }))
-  expect(collapsedMetrics.scrollHeight).toBeGreaterThan(collapsedMetrics.clientHeight)
-  expect(collapsedMetrics.lineClamp).toBe('8')
+  const toggle = orcaPage.getByRole('button', { name: /^Show (more|less)$/ })
+  await expect(toggle).toHaveText('Show more')
+  expect(await toggle.getAttribute('aria-controls')).toBe(await prompt.getAttribute('id'))
+  expect(await prompt.evaluate(promptShowsAllText)).toBe(false)
 
-  await showMore.focus()
+  await toggle.focus()
   await orcaPage.keyboard.press('Enter')
-  await expect(orcaPage.getByRole('button', { name: 'Show less' })).toBeFocused()
-
-  const expandedMetrics = await prompt.evaluate((element) => ({
-    clientHeight: element.clientHeight,
-    scrollHeight: element.scrollHeight,
-    scrollWidth: element.scrollWidth,
-    clientWidth: element.clientWidth,
-    lineClamp: getComputedStyle(element).webkitLineClamp,
-    overflowWrap: getComputedStyle(element).overflowWrap
-  }))
-  expect(expandedMetrics.clientHeight).toBeGreaterThan(80)
-  expect(expandedMetrics.scrollHeight).toBeLessThanOrEqual(expandedMetrics.clientHeight + 1)
-  expect(expandedMetrics.scrollWidth).toBeLessThanOrEqual(expandedMetrics.clientWidth + 1)
-  expect(expandedMetrics.lineClamp).toBe('none')
-  expect(expandedMetrics.overflowWrap).toBe('anywhere')
+  await expect(toggle).toHaveText('Show less')
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(toggle).toBeFocused()
+  expect(await prompt.evaluate(promptShowsAllText)).toBe(true)
 
   const markerProof = await prompt.evaluate(async (element, marker) => {
     const text = element.firstChild
@@ -161,4 +176,11 @@ test('automation detail keeps short prompts readable and reveals a very long pro
   expect(markerProof.selectedText).toBe(END_MARKER)
   expect(markerProof.markerTop).toBeGreaterThanOrEqual(markerProof.visibleTop)
   expect(markerProof.markerBottom).toBeLessThanOrEqual(markerProof.visibleBottom)
+
+  await toggle.focus()
+  await orcaPage.keyboard.press('Enter')
+  await expect(toggle).toHaveText('Show more')
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(toggle).toBeFocused()
+  expect(await prompt.evaluate(promptShowsAllText)).toBe(false)
 })

@@ -18483,7 +18483,8 @@
           "missedRunGrace": "Missed-run grace",
           "execution": "Execution",
           "notRunYet": "Not run yet",
-          "usageDetail": "{{tokens}} tokens · {{known}}/{{total}} runs reported"
+          "usageDetail_one": "{{tokens}} tokens · {{known}}/{{count}} run reported",
+          "usageDetail_other": "{{tokens}} tokens · {{known}}/{{count}} runs reported"
         },
         "AutomationEditorDialog": {
           "fb1896a5e7": "Cancel",
